@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
 import { verifyJWT } from '../Middlewares/auth.middleware.js';
-import { upload } from "../Middlewares/multer.middleware.js";
 import { register, login, updateUser, logout, getCurrentUser } from '../Controller/user.controller.js';
 
 const router = Router();
@@ -17,7 +16,7 @@ router.route('/register').post(
 router.route('/login').post(
     login);
 
-router.route('/:userId').put(
+router.route('/:userId').patch(
     verifyJWT,
     updateUser);
 

@@ -11,11 +11,11 @@ const generateAccessAndRefreshTokens = async (userId) => {
         const user = await User.findById(userId);
         const accessToken = await user.generateAccessToken();
         const refreshToken = await user.generateRefreshToken();
-    
+
         // console.log("😢 Can't reach here")
 
         user.refreshToken = refreshToken;
-        await user.save({ validateBeforeSave: false });    
+        await user.save({ validateBeforeSave: false });
 
         return { accessToken, refreshToken }
     } catch (err) {
@@ -50,6 +50,8 @@ const register = asyncHandler(async (req, res) => {
         await userAddress.save();
     }
 
+
+
     const user = await User.create({
         name: name,
         email: email,
@@ -57,6 +59,11 @@ const register = asyncHandler(async (req, res) => {
         contactNumber: contactNumber,
         address: userAddress,
     })
+
+    if(!user){
+        console.log("😢")
+        throw new ApiErrors(500, "Something went wrong while creating a new user")
+    }
 
     await user.save();
 
@@ -78,7 +85,7 @@ const login = asyncHandler(async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        if(!email){
+        if (!email) {
             throw new ApiErrors(400, "Please enter email")
         }
 
@@ -92,7 +99,7 @@ const login = asyncHandler(async (req, res) => {
             throw new ApiErrors(400, 'Invalid email or password');
         }
 
-        const {accessToken,refreshToken} = await generateAccessAndRefreshTokens(user._id);
+        const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
 
         const loggedInUser = await User.findById(user._id).select(
             "-password -refreshToken"
@@ -104,20 +111,20 @@ const login = asyncHandler(async (req, res) => {
         }
 
         return res
-        .status(200)
-        .cookie("accessToken",accessToken,options)
-        .cookie("refreshToken",refreshToken,options)
-        .json(
-            new ApiResponse(
-                200,
-                {
-                    user: loggedInUser,
-                    accessToken,
-                    refreshToken
-                },
-                "User Logged In Successfully"
+            .status(200)
+            .cookie("accessToken", accessToken, options)
+            .cookie("refreshToken", refreshToken, options)
+            .json(
+                new ApiResponse(
+                    200,
+                    {
+                        user: loggedInUser,
+                        accessToken,
+                        refreshToken
+                    },
+                    "User Logged In Successfully"
+                )
             )
-        )
 
     } catch (error) {
         console.error(error);
@@ -126,11 +133,88 @@ const login = asyncHandler(async (req, res) => {
 })
 
 const logout = asyncHandler(async (req, res) => {
-    
+    await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set: {
+                refreshToken: null
+            }
+        },
+        {
+            new: true
+        }
+    )
+
+    const options = {
+        httpOnly: true,
+        secure: true
+    }
+
+    return res
+        .status(200)
+        .clearCookie("accessToken", options)
+        .clearCookie("refreshToken", options)
+        .json(
+            new ApiResponse(
+                200,
+                "User Logged Out Successfully"
+            )
+        )
 })
 
 const updateUser = asyncHandler(async (req, res) => {
-    // Implement user registration logic
+    const { name, email, contactNumber, address } = req.body
+
+    if (!(name || email || contactNumber || address)) {
+        throw new ApiErrors(400, "Please fill all the fields")
+    }
+
+    const curUser = await User.findOne(req.user._id)
+    const addressId = curUser.address;
+
+    let newAddress = null;
+    if (address) {
+
+        if (!curUser.address) {
+            throw new ApiErrors(400, "User does not have an address to update");
+        }
+
+        newAddress = await Address.findByIdAndUpdate(
+            addressId,
+            {
+                $set: {
+                    street: address.street,
+                    city: address.city,
+                    state: address.state,
+                    country: address.country,
+                    postalCode: address.postalCode
+                }
+            },
+            {
+                new: true
+            }
+        )
+    }
+
+    const user = await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set: {
+                name: name,
+                email: email,
+                contactNumber: contactNumber,
+                address: address ? newAddress._id : addressId
+            },
+
+        },
+        {
+            new: true
+        }
+    ).select("-password -refreshToken")
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, user, "Account details Updated"))
 
 })
 

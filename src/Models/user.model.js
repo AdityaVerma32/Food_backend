@@ -5,10 +5,10 @@ import { ApiErrors } from "../utils/ApiErrors.js";
 
 
 const userSchema = new mongoose.Schema({
+
     name: {
         type: String,
         required: true,
-        unique: true
     },
     email: {
         type: String,
@@ -26,6 +26,10 @@ const userSchema = new mongoose.Schema({
         type: String,
         enum: ['customer', 'admin'],
         default: 'customer'
+    },
+    address:{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Address'
     },
     points: {
         type: Number,
